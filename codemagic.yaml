@@ -1,0 +1,41 @@
+# Codemagic CI/CD 配置文件
+# 用于构建 iOS 版本
+
+workflows:
+  ios-build:
+    name: iOS Build
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      
+    scripts:
+      - name: 获取依赖
+        script: flutter pub get
+        
+      - name: 安装 CocoaPods
+        script: |
+          cd ios
+          pod install --repo-update
+          
+      - name: 构建 iOS Release
+        script: |
+          flutter build ios --release --no-codesign
+          
+      - name: 打包 IPA
+        script: |
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r app.ipa Payload
+          
+    artifacts:
+      - build/ios/iphoneos/app.ipa
+      
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com  # 换成你的邮箱
