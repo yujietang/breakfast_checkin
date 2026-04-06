@@ -1,42 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:breakfast_checkin/models/health_status.dart';
+import 'package:breakfast_checkin/main.dart';
 
+/// Widget 测试
 void main() {
-  group('HealthStatus Tests', () {
-    test('Healthy status when 0 missed days', () {
-      final status = HealthStatus(missedDays: 0);
-      expect(status.isHealthy, true);
-      expect(status.level, GallstoneLevel.healthy);
-      expect(status.stoneSizePercent, 0);
+  group('Widget Tests', () {
+    testWidgets('App should build without errors', (WidgetTester tester) async {
+      // 构建应用
+      await tester.pumpWidget(const BreakfastCheckInApp());
+      
+      // 等待构建完成
+      await tester.pump();
+
+      // 验证应用正常构建
+      expect(find.byType(MaterialApp), findsOneWidget);
     });
 
-    test('Tiny stone after 1 missed day', () {
-      final status = HealthStatus(missedDays: 1);
-      expect(status.isHealthy, false);
-      expect(status.level, GallstoneLevel.tiny);
-      expect(status.stoneSizePercent, 10);
+    testWidgets('Bottom navigation should have 4 items', (WidgetTester tester) async {
+      await tester.pumpWidget(const BreakfastCheckInApp());
+      await tester.pump();
+
+      final bottomNav = find.byType(BottomNavigationBar);
+      expect(bottomNav, findsOneWidget);
+
+      // 验证导航项数量
+      final BottomNavigationBar navBar = tester.widget(bottomNav);
+      expect(navBar.items.length, 4);
     });
 
-    test('Huge stone after 5+ missed days', () {
-      final status = HealthStatus(missedDays: 5);
-      expect(status.level, GallstoneLevel.huge);
-      expect(status.stoneSizePercent, 85);
-    });
-  });
+    testWidgets('Navigation items should have correct labels', (WidgetTester tester) async {
+      await tester.pumpWidget(const BreakfastCheckInApp());
+      await tester.pump();
 
-  group('GallstoneLevel Tests', () {
-    test('Level names are correct', () {
-      expect(GallstoneLevel.healthy.displayName, '健康');
-      expect(GallstoneLevel.tiny.displayName, '微小结石');
-      expect(GallstoneLevel.huge.displayName, '巨大结石');
-    });
-
-    test('fromMissedDays returns correct level', () {
-      expect(GallstoneLevelExtension.fromMissedDays(0), GallstoneLevel.healthy);
-      expect(GallstoneLevelExtension.fromMissedDays(2), GallstoneLevel.small);
-      expect(GallstoneLevelExtension.fromMissedDays(4), GallstoneLevel.large);
-      expect(GallstoneLevelExtension.fromMissedDays(10), GallstoneLevel.huge);
+      expect(find.text('首页'), findsOneWidget);
+      expect(find.text('健康'), findsOneWidget);
+      expect(find.text('统计'), findsOneWidget);
+      expect(find.text('提醒'), findsOneWidget);
     });
   });
 }

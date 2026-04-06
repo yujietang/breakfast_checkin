@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
-import 'screens/home_screen.dart';
+import 'screens/home_screen_v2.dart';
 import 'screens/health_screen.dart';
-import 'screens/stats_screen.dart';
+import 'screens/stats_screen_v2.dart';
 import 'screens/reminder_screen.dart';
-import 'services/database_service.dart';
 import 'services/notification_service.dart';
 
 void main() async {
@@ -42,10 +41,10 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
-    HomeScreen(),
-    HealthScreen(),
-    StatsScreen(),      // 统计页面
-    ReminderScreen(),   // 提醒设置页面
+    HomeScreenV2(),      // 升级版首页
+    HealthScreen(),      // 健康页面
+    StatsScreenV2(),     // 升级版统计页面
+    ReminderScreen(),    // 提醒设置页面
   ];
 
   @override
@@ -56,6 +55,8 @@ class _MainScreenState extends State<MainScreen> {
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,
+        selectedItemColor: Theme.of(context).primaryColor,
+        unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),

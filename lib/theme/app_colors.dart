@@ -16,6 +16,10 @@ class AppColors {
   static const Color success = Color(0xFF66BB6A); // 打卡成功绿
   static const Color warning = Color(0xFFFFCA28); // 警告黄
   static const Color danger = Color(0xFFEF5350); // 漏打卡红
+  static const Color error = Color(0xFFEF5350); // 错误红（同danger）
+  
+  // 渐变用色
+  static const Color primaryDark = Color(0xFFF57C00); // 深橙色
 
   // 文字色
   static const Color textPrimary = Color(0xFF3E2723); // 深棕
