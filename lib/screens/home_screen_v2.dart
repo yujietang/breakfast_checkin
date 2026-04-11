@@ -396,67 +396,7 @@ class _HomeScreenV2State extends State<HomeScreenV2>
                 ),
               ),
               
-              // 会员提示
-              if (!userData.isPremiumValid)
-                Container(
-                  margin: const EdgeInsets.only(top: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.amber.withAlpha(30),
-                        Colors.orange.withAlpha(20),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.amber.withAlpha(100)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.diamond,
-                        color: Colors.amber,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '升级会员',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '解锁全部结石等级、无限补卡、去除广告',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const StoreScreen()),
-                          ).then((_) => _loadData());
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('查看'),
-                      ),
-                    ],
-                  ),
-                ),
+
             ],
           ),
         ),

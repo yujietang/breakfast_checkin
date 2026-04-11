@@ -13,7 +13,7 @@ void main() {
       expect(userData.consecutiveMissedDays, 0);
       expect(userData.currentSkin, 'default');
       expect(userData.isPremium, false);
-      expect(userData.emergencyCards, 1);
+      expect(userData.emergencyCards, 999); // 免费版：无限急救卡
       expect(userData.unlockedAchievements, isEmpty);
       expect(userData.purchasedSkins, contains('default'));
       expect(userData.disclaimerAccepted, false);
