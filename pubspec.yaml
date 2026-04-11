@@ -62,6 +62,9 @@ dependencies:
   
   # UI 增强
   google_fonts: ^6.2.1
+  
+  # 加密
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:

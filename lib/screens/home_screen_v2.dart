@@ -24,6 +24,7 @@ class _HomeScreenV2State extends State<HomeScreenV2>
   bool _isLoading = true;
   UserData? _userData;
   late AnimationController _animationController;
+  bool _isDebugVisible = false; // 调试模式开关
 
   @override
   void initState() {
@@ -84,13 +85,27 @@ class _HomeScreenV2State extends State<HomeScreenV2>
     }
 
     final now = DateTime.now();
-    final newAchievements = await _userService.addCheckIn(now);
+    final result = await _userService.addCheckIn(now);
 
     await _loadData();
+
+    if (!result.success) {
+      // 打卡失败（如防作弊检测未通过）
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+      }
+      return;
+    }
+
     _animationController.forward(from: 0);
 
     if (mounted) {
-      _showCheckInSuccess(newAchievements);
+      _showCheckInSuccess(result.unlockedAchievements);
     }
   }
 
@@ -263,6 +278,80 @@ class _HomeScreenV2State extends State<HomeScreenV2>
     );
   }
 
+  /// 漏打状态警告
+  Widget _buildMissedWarning(UserData userData) {
+    final level = userData.stoneLevel;
+    final missedDays = userData.consecutiveMissedDays;
+    
+    Color warningColor;
+    String warningText;
+    IconData icon;
+    
+    if (level >= 4) {
+      warningColor = Colors.brown;
+      warningText = '⚠️ 紧急！胆囊已被结石填满，连续漏打 $missedDays 天';
+      icon = Icons.warning_amber;
+    } else if (level >= 3) {
+      warningColor = Colors.red;
+      warningText = '🔴 警告！大结石形成中，连续漏打 $missedDays 天';
+      icon = Icons.error;
+    } else if (level >= 2) {
+      warningColor = Colors.orange;
+      warningText = '🟠 注意！小结石在长大，连续漏打 $missedDays 天';
+      icon = Icons.warning;
+    } else {
+      warningColor = Colors.yellow.shade700;
+      warningText = '🟡 提醒：漏打 $missedDays 天，结石开始形成';
+      icon = Icons.info;
+    }
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: warningColor.withAlpha(20),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: warningColor.withAlpha(100)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: warningColor, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              warningText,
+              style: TextStyle(
+                color: warningColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 显示调试信息
+  void _showDebugInfo() {
+    final debugInfo = _userService.getDebugInfo();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('调试信息'),
+        content: SingleChildScrollView(
+          child: Text(debugInfo),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading || _userData == null) {
@@ -290,6 +379,18 @@ class _HomeScreenV2State extends State<HomeScreenV2>
           style: TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
+          // 调试按钮（长按触发）
+          GestureDetector(
+            onLongPress: _showDebugInfo,
+            child: IconButton(
+              icon: const Icon(Icons.bug_report, color: AppColors.textPrimary),
+              onPressed: () {
+                // 短按切换调试信息显示
+                setState(() => _isDebugVisible = !_isDebugVisible);
+              },
+              tooltip: '长按查看调试信息',
+            ),
+          ),
           // 导出按钮
           IconButton(
             icon: const Icon(Icons.download, color: AppColors.textPrimary),
@@ -319,7 +420,13 @@ class _HomeScreenV2State extends State<HomeScreenV2>
                 currentStreak: userData.currentStreak,
                 longestStreak: userData.longestStreak,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              
+              // 漏打状态警告（如果有）
+              if (userData.consecutiveMissedDays > 0)
+                _buildMissedWarning(userData),
+              
+              const SizedBox(height: 16),
               
               // 胆结石视觉展示
               GallstoneVisualV2(

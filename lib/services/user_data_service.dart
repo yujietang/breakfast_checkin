@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_data.dart';
 import '../models/achievement.dart';
 import '../utils/time_utils.dart';
+import 'missed_checkin_detector.dart';
+import 'secure_storage_service.dart';
+import 'anti_cheat_service.dart';
 
 /// 用户数据服务
 class UserDataService extends ChangeNotifier {
@@ -11,7 +13,8 @@ class UserDataService extends ChangeNotifier {
   factory UserDataService() => _instance;
   UserDataService._internal();
 
-  static const String _userDataKey = 'user_data_v2';
+  final SecureStorageService _secureStorage = SecureStorageService();
+  final AntiCheatService _antiCheat = AntiCheatService();
   
   UserData _userData = const UserData();
   bool _isLoaded = false;
@@ -23,15 +26,16 @@ class UserDataService extends ChangeNotifier {
   Future<void> loadUserData() async {
     if (_isLoaded) return;
     
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = prefs.getString(_userDataKey);
+    // 尝试从安全存储加载
+    final secureData = await _secureStorage.getSecureMap(
+      SecureStorageKeys.userData,
+    );
     
-    if (jsonStr != null) {
+    if (secureData != null) {
       try {
-        final map = jsonDecode(jsonStr) as Map<String, dynamic>;
-        _userData = UserData.fromMap(map);
+        _userData = UserData.fromMap(secureData);
       } catch (e) {
-        debugPrint('加载用户数据失败: $e');
+        debugPrint('加载加密用户数据失败: $e');
         _userData = const UserData();
       }
     }
@@ -43,10 +47,12 @@ class UserDataService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 保存用户数据
+  /// 保存用户数据（加密存储）
   Future<void> saveUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_userDataKey, jsonEncode(_userData.toMap()));
+    await _secureStorage.setSecureMap(
+      SecureStorageKeys.userData,
+      _userData.toMap(),
+    );
     notifyListeners();
   }
 
@@ -64,7 +70,29 @@ class UserDataService extends ChangeNotifier {
   }
 
   /// 添加打卡记录
-  Future<List<String>> addCheckIn(DateTime dateTime) async {
+  Future<CheckInResult> addCheckIn(DateTime dateTime) async {
+    // 1. 防作弊检测
+    final antiCheatResult = _antiCheat.checkCanCheckIn(
+      _userData.lastCheckInDate ?? DateTime(1970),
+    );
+    
+    if (!antiCheatResult.isAllowed) {
+      return CheckInResult(
+        success: false,
+        message: antiCheatResult.reason,
+        unlockedAchievements: [],
+      );
+    }
+
+    // 2. 验证打卡时间合理性
+    if (!_antiCheat.isCheckInTimeValid(dateTime, _userData.lastCheckInDate)) {
+      return CheckInResult(
+        success: false,
+        message: '⚠️ 打卡时间异常，请检查设备时间',
+        unlockedAchievements: [],
+      );
+    }
+
     final checkIns = List<DateTime>.from(_userData.checkIns)..add(dateTime);
     
     // 计算新的连续天数
@@ -91,7 +119,19 @@ class UserDataService extends ChangeNotifier {
     await saveUserData();
 
     // 检查解锁的成就
-    return _checkAchievements(recovered: recovered, earlyHour: dateTime.hour);
+    final unlockedAchievements = _checkAchievements(
+      recovered: recovered, 
+      earlyHour: dateTime.hour,
+    );
+
+    // 检查皮肤解锁
+    _checkSkinUnlocks(unlockedAchievements);
+
+    return CheckInResult(
+      success: true,
+      message: '打卡成功！',
+      unlockedAchievements: unlockedAchievements,
+    );
   }
 
   /// 使用急救卡补卡（补昨天）
@@ -134,29 +174,112 @@ class UserDataService extends ChangeNotifier {
 
   /// 检查漏打（每日调用）
   Future<void> checkMissedDays() async {
-    if (_userData.lastCheckInDate == null) return;
-
-    final today = TimeUtils.startOfDay(DateTime.now());
-    final lastCheckIn = TimeUtils.startOfDay(_userData.lastCheckInDate!);
-
-    // 如果今天还没过打卡时间，不算漏打
-    if (TimeUtils.isSameDay(lastCheckIn, today)) return;
-
-    final daysDiff = today.difference(lastCheckIn).inDays;
+    final result = MissedCheckInDetector.detect(_userData);
     
-    if (daysDiff > 1) {
-      // 漏打了
-      final missedDays = _userData.missedDays + daysDiff - 1;
-      final consecutiveMissedDays = daysDiff - 1;
-
+    if (result.hasMissed) {
       _userData = _userData.copyWith(
-        missedDays: missedDays,
-        consecutiveMissedDays: consecutiveMissedDays,
+        missedDays: result.totalMissedDays,
+        consecutiveMissedDays: result.consecutiveMissedDays,
         currentStreak: 0, // 连续打卡中断
       );
+      await saveUserData();
+      
+      if (kDebugMode) {
+        debugPrint('【漏打卡检测】检测到漏打！');
+        debugPrint(MissedCheckInDetector.getDebugInfo(_userData));
+      }
+    }
+  }
+  
+  /// 获取漏打卡调试信息
+  String getDebugInfo() {
+    return MissedCheckInDetector.getDebugInfo(_userData);
+  }
 
+  /// 检查皮肤解锁（成就达成时自动解锁）
+  void _checkSkinUnlocks(List<String> unlockedAchievements) {
+    final currentSkins = List<String>.from(_userData.purchasedSkins);
+    var hasNewSkin = false;
+
+    for (final achievementId in unlockedAchievements) {
+      final skinId = _getSkinIdForAchievement(achievementId);
+      if (skinId != null && !currentSkins.contains(skinId)) {
+        currentSkins.add(skinId);
+        hasNewSkin = true;
+        
+        if (kDebugMode) {
+          debugPrint('【皮肤解锁】成就 $achievementId 解锁皮肤 $skinId');
+        }
+      }
+    }
+
+    // 检查连续打卡解锁
+    final streakSkin = _getSkinIdForStreak(_userData.currentStreak);
+    if (streakSkin != null && !currentSkins.contains(streakSkin)) {
+      currentSkins.add(streakSkin);
+      hasNewSkin = true;
+    }
+
+    // 检查累计打卡解锁
+    final totalCheckIns = _userData.checkIns.toSet().length;
+    final totalSkin = _getSkinIdForTotalCheckIns(totalCheckIns);
+    if (totalSkin != null && !currentSkins.contains(totalSkin)) {
+      currentSkins.add(totalSkin);
+      hasNewSkin = true;
+    }
+
+    if (hasNewSkin) {
+      _userData = _userData.copyWith(purchasedSkins: currentSkins);
+      saveUserData();
+    }
+  }
+
+  /// 成就对应皮肤映射
+  String? _getSkinIdForAchievement(String achievementId) {
+    final mapping = {
+      'streak_7': 'gold',      // 7天完美 → 黄金胆囊
+      'streak_30': 'crystal',  // 30天勇士 → 水晶结石
+      'streak_100': 'rainbow', // 百日战神 → 彩虹胆囊
+      'survivor': 'blackhole', // 结石幸存者 → 黑洞吞噬
+    };
+    return mapping[achievementId];
+  }
+
+  /// 连续打卡对应皮肤
+  String? _getSkinIdForStreak(int streak) {
+    if (streak >= 7) return 'gold';
+    return null;
+  }
+
+  /// 累计打卡对应皮肤
+  String? _getSkinIdForTotalCheckIns(int total) {
+    if (total >= 30) return 'crystal';
+    if (total >= 50) return 'rainbow';
+    return null;
+  }
+
+  /// 分享奖励：获得急救卡
+  Future<void> rewardForShare() async {
+    // 分享奖励：获得1张急救卡
+    final newCards = _userData.emergencyCards + 1;
+    _userData = _userData.copyWith(emergencyCards: newCards);
+    await saveUserData();
+  }
+
+  /// 邀请奖励：解锁限定皮肤
+  Future<void> rewardForInvite() async {
+    // 邀请奖励：解锁黑洞吞噬皮肤
+    final currentSkins = List<String>.from(_userData.purchasedSkins);
+    if (!currentSkins.contains('blackhole')) {
+      currentSkins.add('blackhole');
+      _userData = _userData.copyWith(purchasedSkins: currentSkins);
       await saveUserData();
     }
+  }
+
+  /// 获取防作弊调试信息
+  String getAntiCheatDebugInfo() {
+    return _antiCheat.getDebugInfo();
   }
 
   /// 检查成就解锁
@@ -238,9 +361,8 @@ class UserDataService extends ChangeNotifier {
     await saveUserData();
   }
 
-  /// 购买皮肤
+  /// 购买皮肤（免费版：直接解锁）
   Future<bool> purchaseSkin(String skinId) async {
-    // 这里应该调用支付接口，简化处理
     if (_userData.purchasedSkins.contains(skinId)) return true;
 
     final newSkins = List<String>.from(_userData.purchasedSkins)..add(skinId);
@@ -256,13 +378,10 @@ class UserDataService extends ChangeNotifier {
     await saveUserData();
   }
 
-  /// 升级会员
+  /// 升级会员（免费版：已废弃，保持兼容）
   Future<void> upgradePremium(DateTime expiryDate) async {
-    _userData = _userData.copyWith(
-      isPremium: true,
-      premiumExpiry: expiryDate,
-    );
-    await saveUserData();
+    // 免费版：所有功能已开放，此方法保留以保持兼容
+    debugPrint('【注意】免费版无需升级会员');
   }
 
   /// 接受免责声明
@@ -321,4 +440,17 @@ class UserDataService extends ChangeNotifier {
     _userData = const UserData();
     await saveUserData();
   }
+}
+
+/// 打卡结果
+class CheckInResult {
+  final bool success;
+  final String message;
+  final List<String> unlockedAchievements;
+
+  const CheckInResult({
+    required this.success,
+    required this.message,
+    required this.unlockedAchievements,
+  });
 }
