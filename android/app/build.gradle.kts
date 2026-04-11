@@ -38,6 +38,16 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // 分包配置：按CPU架构分离APK
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86_64")
+            isUniversalApk = false // 不生成通用包
+        }
+    }
 }
 
 dependencies {

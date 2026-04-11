@@ -35,18 +35,19 @@ class ReminderSetting {
   }
 
   factory ReminderSetting.fromMap(Map<String, dynamic> map) {
+    final repeatDaysStr = map['repeatDays'] as String?;
+    final repeatDays = repeatDaysStr != null && repeatDaysStr.isNotEmpty
+        ? repeatDaysStr.split(',').where((s) => s.isNotEmpty).map((s) => int.tryParse(s) ?? 0).toList()
+        : [1, 2, 3, 4, 5, 6, 7]; // 默认每天
+    
     return ReminderSetting(
-      id: map['id'] as String,
+      id: map['id'] as String? ?? 'default',
       time: TimeOfDay(
-        hour: map['hour'] as int,
-        minute: map['minute'] as int,
+        hour: map['hour'] as int? ?? 7,
+        minute: map['minute'] as int? ?? 30,
       ),
-      isEnabled: map['isEnabled'] == 1,
-      repeatDays: (map['repeatDays'] as String)
-          .split(',')
-          .where((s) => s.isNotEmpty)
-          .map((s) => int.parse(s))
-          .toList(),
+      isEnabled: map['isEnabled'] == 1 || map['isEnabled'] == true,
+      repeatDays: repeatDays,
       label: map['label'] as String?,
     );
   }

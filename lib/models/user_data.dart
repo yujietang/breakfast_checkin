@@ -5,13 +5,13 @@ class UserData {
   final int longestStreak; // 历史最高
   final int missedDays; // 累计漏打（影响结石等级）
   final int consecutiveMissedDays; // 连续漏打天数
-  final String currentSkin; // 当前皮肤ID
-  final bool isPremium; // 是否会员
-  final DateTime? premiumExpiry; // 会员到期日
+  final String currentSkin; // 当前皮肤ID（已废弃，保持兼容）
+  final bool isPremium; // 是否会员（已废弃，保持兼容）
+  final DateTime? premiumExpiry; // 会员到期日（已废弃，保持兼容）
   final int emergencyCards; // 剩余急救卡数量
   final DateTime? lastEmergencyCardUsed; // 上次使用急救卡时间
   final List<String> unlockedAchievements; // 已解锁成就ID列表
-  final List<String> purchasedSkins; // 已购买皮肤列表
+  final List<String> purchasedSkins; // 已购买皮肤列表（已废弃，保持兼容）
   final bool disclaimerAccepted; // 是否接受免责声明
   final DateTime? lastCheckInDate; // 最后打卡日期
 
@@ -24,7 +24,7 @@ class UserData {
     this.currentSkin = 'default',
     this.isPremium = false,
     this.premiumExpiry,
-    this.emergencyCards = 1, // 每周1张急救卡
+    this.emergencyCards = 999, // 免费版：无限急救卡
     this.lastEmergencyCardUsed,
     this.unlockedAchievements = const [],
     this.purchasedSkins = const ['default'],
@@ -55,12 +55,8 @@ class UserData {
     return daysSinceLastUse < 7;
   }
 
-  /// 本周剩余的急救卡数量
-  int get weeklyEmergencyCards {
-    if (isPremium) return 999; // 会员无限补卡
-    if (usedEmergencyCardThisWeek) return 0;
-    return emergencyCards;
-  }
+  /// 本周剩余的急救卡数量（免费版：无限）
+  int get weeklyEmergencyCards => 999;
 
   /// 会员是否有效
   bool get isPremiumValid {

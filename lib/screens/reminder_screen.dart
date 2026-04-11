@@ -26,11 +26,23 @@ class _ReminderScreenState extends State<ReminderScreen> {
   }
 
   Future<void> _loadReminders() async {
-    final reminders = await _db.getAllReminders();
-    setState(() {
-      _reminders = reminders;
-      _isLoading = false;
-    });
+    try {
+      final reminders = await _db.getAllReminders();
+      if (mounted) {
+        setState(() {
+          _reminders = reminders;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载提醒失败: $e');
+      if (mounted) {
+        setState(() {
+          _reminders = [];
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
