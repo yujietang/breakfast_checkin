@@ -23,11 +23,8 @@ class GallstoneVisualV2 extends StatelessWidget {
     final stoneLevel = StoneLevel.fromLevel(userData.stoneLevel);
     final skin = StoneSkin.getById(userData.currentSkin);
     
-    // 检查是否有权限显示高级别结石
-    final canViewFullLevel = userData.isPremiumValid || stoneLevel.isFree;
-    final displayLevel = canViewFullLevel 
-        ? stoneLevel 
-        : StoneLevel.allLevels[2]; // 免费用户最高看到Level 2
+    // 免费版：所有用户都能看到完整等级
+    final displayLevel = stoneLevel;
 
     return Column(
       children: [
@@ -109,34 +106,6 @@ class GallstoneVisualV2 extends StatelessWidget {
             ),
           ),
         ),
-        // 付费提示（如果受限）
-        if (!canViewFullLevel && userData.stoneLevel > 2)
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.warning.withAlpha(25),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.lock_outline,
-                  size: 14,
-                  color: AppColors.warning,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  '升级会员查看完整状态',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.warning,
-                  ),
-                ),
-              ],
-            ),
-          ),
       ],
     );
   }

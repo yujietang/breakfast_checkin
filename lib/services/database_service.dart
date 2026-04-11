@@ -240,12 +240,46 @@ class DatabaseService {
 
   /// 获取所有提醒设置
   Future<List<ReminderSetting>> getAllReminders() async {
-    if (_useMemoryStorage) {
-      return List.unmodifiable(_memoryReminders);
+    try {
+      if (_useMemoryStorage) {
+        return List.unmodifiable(_memoryReminders);
+      }
+      final db = await database;
+      
+      // 检查表是否存在
+      final tableExists = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='reminder_settings'"
+      );
+      if (tableExists.isEmpty) {
+        // 表不存在，重新创建
+        await _onCreate(db, 1);
+      }
+      
+      final maps = await db.query('reminder_settings');
+      
+      // 如果没有提醒，创建默认提醒
+      if (maps.isEmpty) {
+        final defaultReminder = ReminderSetting(
+          id: 'default',
+          time: const TimeOfDay(hour: 7, minute: 30),
+          isEnabled: true,
+        );
+        await updateReminder(defaultReminder);
+        return [defaultReminder];
+      }
+      
+      return maps.map((m) => ReminderSetting.fromMap(m)).toList();
+    } catch (e) {
+      debugPrint('获取提醒失败: $e');
+      // 返回默认提醒
+      return [
+        const ReminderSetting(
+          id: 'default',
+          time: TimeOfDay(hour: 7, minute: 30),
+          isEnabled: true,
+        ),
+      ];
     }
-    final db = await database;
-    final maps = await db.query('reminder_settings');
-    return maps.map((m) => ReminderSetting.fromMap(m)).toList();
   }
 
   /// 更新提醒设置

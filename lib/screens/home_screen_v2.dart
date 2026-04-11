@@ -4,7 +4,6 @@ import '../models/user_data.dart';
 import '../services/user_data_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/time_utils.dart';
-import '../widgets/common/disclaimer_dialog.dart';
 import '../widgets/home/checkin_button_v2.dart';
 import '../widgets/home/gallstone_visual_v2.dart';
 import '../widgets/home/streak_card.dart';
@@ -52,16 +51,9 @@ class _HomeScreenV2State extends State<HomeScreenV2>
       _isLoading = false;
     });
 
-    // 检查是否需要显示免责声明
-    if (!mounted) return;
+    // 免费版：自动接受免责声明，不弹窗
     if (!_userData!.disclaimerAccepted) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) {
-        await DisclaimerDialog.show(context, () async {
-          await _userService.acceptDisclaimer();
-          await _loadData();
-        });
-      }
+      await _userService.acceptDisclaimer();
     }
   }
 
